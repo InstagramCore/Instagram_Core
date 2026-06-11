@@ -54,8 +54,8 @@ except ImportError:
 try:
     from config import Config
     from main import (
-        create_and_upload_reel,
-        make_and_upload_story,
+        make_story_png,
+        create_reel,
         upload_all,
         upload_pending_reels,
         upload_pending_stories,
@@ -170,11 +170,11 @@ def _menu_sakht() -> None:
     while True:
         _cls()
         print()
-        print(CM + _box("📸  SAKHT  +  📤  AUTO-UPLOAD", "Besaz va be Instagram befrest") + RST)
+        print(CM + _box("📸  SAKHT", "Besaz va zakhire kon — upload jodast") + RST)
         print()
-        print(_row("Sakht Story",  "→  Besaz  +  upload story",       "1"))
-        print(_row("Sakht Reels",  "→  Besaz  +  upload reel",        "2"))
-        print(_row("Sakht Hardo",  "→  Besaz + upload (Story + Reel)", "3"))
+        print(_row("Sakht Story",  "→  AI story bezar tu stories/",   "1"))
+        print(_row("Sakht Reels",  "→  Reel bezar tu reels/",         "2"))
+        print(_row("Sakht Hardo",  "→  Story + Reel har do zakhire",   "3"))
         print(_sep())
         print(_row("Bargasht", num="0"))
         print()
@@ -182,18 +182,18 @@ def _menu_sakht() -> None:
         choice = input(f"  {CYL}Entekhab:{RST} ").strip()
 
         if choice == "1":
-            _run("Sakht + Upload Story", make_and_upload_story)
+            _run("Sakht Story", make_story_png)
 
         elif choice == "2":
-            _run("Sakht + Upload Reels", create_and_upload_reel)
+            _run("Sakht Reels", create_reel)
 
         elif choice == "3":
             def _hardo_sakht() -> None:
-                _info("[1/2]  Sakht + Upload Story...")
-                make_and_upload_story()
-                _info("[2/2]  Sakht + Upload Reels...")
-                create_and_upload_reel()
-            _run("Sakht + Upload Hardo", _hardo_sakht)
+                _info("[1/2]  Sakht Story...")
+                make_story_png()
+                _info("[2/2]  Sakht Reels...")
+                create_reel()
+            _run("Sakht Hardo", _hardo_sakht)
 
         elif choice in ("0", ""):
             break
