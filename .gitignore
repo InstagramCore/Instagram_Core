@@ -1,0 +1,40 @@
+# ── Credentials & secrets ─────────────────────────────────────────────────────
+.env
+*.key
+*.pem
+
+# ── Large media assets (store on OneDrive / Google Drive) ─────────────────────
+assets/videos/
+assets/music/
+
+# ── Runtime storage ───────────────────────────────────────────────────────────
+storage/sessions/
+storage/logs/
+storage/reels/
+storage/stories/
+storage/uploaded/
+storage/music_history.json
+
+# ── Python cache ──────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# ── Virtual environments ──────────────────────────────────────────────────────
+.venv/
+venv/
+env/
+ENV/
+
+# ── Temp / build files ────────────────────────────────────────────────────────
+_tmp_*
+*.tmp
+*.log
+*.lock
+
+# ── OS files ──────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
