@@ -48,11 +48,11 @@ def _generate_with_gemini(config: Config, prompt: str, topic: str) -> Dict[str, 
         raise RuntimeError("GEMINI_API_KEY is not set in .env")
 
     try:
-        import google.generativeai as genai
+        from google import genai as google_genai
     except ImportError:
-        raise RuntimeError("google-generativeai not installed. Run: pip install google-generativeai")
+        raise RuntimeError("google-genai not installed. Run: pip install google-genai")
 
-    genai.configure(api_key=config.GEMINI_API_KEY)
+    client = google_genai.Client(api_key=config.GEMINI_API_KEY)
 
     GEMINI_MODELS = [
         ("gemini-2.5-flash-lite", "free"),
@@ -64,11 +64,10 @@ def _generate_with_gemini(config: Config, prompt: str, topic: str) -> Dict[str, 
 
     for model_name, tier in GEMINI_MODELS:
         logger.info(f"Trying Gemini model: {model_name} ({tier})")
-        model = genai.GenerativeModel(model_name)
 
         for attempt in range(config.MAX_RETRIES):
             try:
-                response = model.generate_content(prompt)
+                response = client.models.generate_content(model=model_name, contents=prompt)
                 raw = response.text.strip()
                 content = _parse_json_response(raw)
                 content["topic"] = topic

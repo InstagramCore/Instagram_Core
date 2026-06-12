@@ -250,8 +250,11 @@ def run_daily(
 
     print(f"{'='*48}\n")
 
-    logger.info("Daily pipeline complete")
-    _mark_ran(config, run_date)
+    if do_story or do_reel:
+        logger.info("Daily pipeline complete")
+        _mark_ran(config, run_date)
+    else:
+        logger.info("Daily pipeline: no tasks enabled — lock file not written")
     return 0
 
 
