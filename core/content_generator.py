@@ -156,9 +156,8 @@ class ContentGenerator:
 
             except Exception as e:
                 last_error = e
-                logger.warning(f"OpenAI attempt {attempt + 1} failed: {e}")
-                if attempt < self.config.MAX_RETRIES - 1:
-                    time.sleep(self.config.RETRY_DELAY)
+                logger.warning(f"OpenAI failed: {e} — switching to Gemini")
+                break
 
         logger.info("Attempting Gemini fallback...")
         try:
