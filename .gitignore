@@ -9,6 +9,7 @@ assets/music/
 
 # ── Runtime storage ───────────────────────────────────────────────────────────
 storage/sessions/
+sessions/
 storage/logs/
 storage/reels/
 storage/stories/

@@ -29,7 +29,9 @@ class Config:
     GEMINI_API_KEY:     str = field(default_factory=lambda: os.getenv("GEMINI_API_KEY", ""))
     INSTAGRAM_USERNAME: str = field(default_factory=lambda: os.getenv("INSTAGRAM_USERNAME", ""))
     INSTAGRAM_PASSWORD: str = field(default_factory=lambda: os.getenv("INSTAGRAM_PASSWORD", ""))
+    INSTAGRAM_EMAIL:    str = field(default_factory=lambda: os.getenv("INSTAGRAM_EMAIL", ""))
     INSTAGRAM_HANDLE:   str = field(default_factory=lambda: os.getenv("INSTAGRAM_HANDLE", "@vienna_streetvibes"))
+    INSTAGRAM_PROXY:    str = field(default_factory=lambda: os.getenv("INSTAGRAM_PROXY", ""))
 
     # ==============================
     # ASSETS

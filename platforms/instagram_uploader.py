@@ -47,16 +47,40 @@ def _is_login_error(exc: Exception) -> bool:
 logger = logging.getLogger(__name__)
 
 
+_DEVICE_SETTINGS = {
+    "app_version": "269.0.0.18.75",
+    "android_version": 26,
+    "android_release": "8.0.0",
+    "dpi": "480dpi",
+    "resolution": "1080x1920",
+    "manufacturer": "OnePlus",
+    "device": "devitron",
+    "model": "6T Dev",
+    "cpu": "qcom",
+    "version_code": "314665256",
+}
+
+
 class InstagramUploader:
     def __init__(self, config):
         self.config = config
-        self.client = Client()
-        self.client.delay_range = [3, 6]
+        self.client = self._make_client()
 
         self.session_file = self.config.SESSIONS_DIR / "instagram.json"
         self.session_file.parent.mkdir(parents=True, exist_ok=True)
 
         self._login()
+
+    def _make_client(self) -> Client:
+        cl = Client()
+        cl.delay_range = [3, 6]
+        cl.set_device(_DEVICE_SETTINGS)
+        cl.set_user_agent()
+        proxy = getattr(self.config, "INSTAGRAM_PROXY", "") or ""
+        if proxy:
+            cl.set_proxy(proxy)
+            logger.info(f"Instagram proxy set: {proxy.split('@')[-1]}")
+        return cl
 
     # ── Login / Session ────────────────────────────────────────────────────
 
@@ -70,7 +94,6 @@ class InstagramUploader:
         if self.session_file.exists():
             try:
                 self.client.load_settings(str(self.session_file))
-                self.client.login(username, password)
                 self.client.get_timeline_feed()
                 logger.info("Instagram session loaded")
                 return
@@ -81,8 +104,7 @@ class InstagramUploader:
             except Exception as e:
                 logger.warning(f"Session invalid: {e} — fresh login")
                 self.session_file.unlink(missing_ok=True)
-                self.client = Client()
-                self.client.delay_range = [3, 6]
+                self.client = self._make_client()
 
         time.sleep(random.uniform(3, 7))
 
@@ -102,8 +124,7 @@ class InstagramUploader:
     def _relogin_once(self) -> None:
         logger.info("Re-login Instagram...")
         self.session_file.unlink(missing_ok=True)
-        self.client = Client()
-        self.client.delay_range = [3, 6]
+        self.client = self._make_client()
         time.sleep(random.uniform(5, 10))
         self._login()
 
