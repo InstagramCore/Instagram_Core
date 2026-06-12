@@ -7,14 +7,13 @@ import gc
 import time as _time
 import shutil as _shutil
 import logging
-import subprocess
 from pathlib import Path
 from typing import Optional, List
 
 sys.path.insert(0, str(Path(__file__).parent))
 
 from config import Config
-from utils.helpers import setup_logger
+from utils.helpers import setup_logger, probe_video
 
 from core.content_generator import ContentGenerator
 from core.image_generator import ImageGenerator
@@ -131,22 +130,6 @@ def upload_pending_stories() -> None:
 # REELS
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _probe_video(path: Path) -> bool:
-    """Return True if ffprobe can read a valid duration from the file."""
-    try:
-        r = subprocess.run(
-            [
-                "ffprobe", "-v", "error",
-                "-show_entries", "format=duration",
-                "-of", "default=noprint_wrappers=1:nokey=1",
-                str(path),
-            ],
-            capture_output=True, text=True, timeout=10,
-        )
-        return r.returncode == 0 and bool(r.stdout.strip())
-    except Exception:
-        return False
-
 
 def get_raw_videos() -> List[Path]:
     videos, seen = [], set()
@@ -247,7 +230,7 @@ def create_reel() -> Optional[Path]:
 
     # ffprobe validation — runs quickly, catches moov-atom / truncated files
     print("\n Checking video files...")
-    ok_map: dict = {v: _probe_video(v) for v in videos}
+    ok_map: dict = {v: probe_video(v) for v in videos}
 
     print("\n Available raw videos:")
     for i, v in enumerate(videos, 1):
@@ -311,6 +294,8 @@ def create_reel() -> Optional[Path]:
             except Exception as e:
                 logger.warning(f"Could not archive '{raw.name}': {e}")
                 break
+        else:
+            logger.warning(f"Could not archive raw video after 4 tries — still in raw/: {raw.name}")
 
     return output
 

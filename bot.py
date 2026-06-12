@@ -157,8 +157,7 @@ def _run(title: str, fn: Callable[[], Any]) -> None:
         _err("Lagv shod (Ctrl+C).")
     except Exception as exc:
         _err(f"Khata: {exc}")
-        if os.getenv("DEBUG"):
-            traceback.print_exc()
+        traceback.print_exc()
     _pause()
 
 

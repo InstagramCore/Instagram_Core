@@ -19,7 +19,6 @@ import time
 import shutil
 import logging
 import argparse
-import subprocess
 from datetime import datetime, date
 from pathlib import Path
 from typing import Optional, Tuple
@@ -27,7 +26,7 @@ from typing import Optional, Tuple
 sys.path.insert(0, str(Path(__file__).parent))
 
 from config import Config
-from utils.helpers import setup_logger
+from utils.helpers import setup_logger, probe_video
 from core.content_generator import ContentGenerator
 from core.image_generator import ImageGenerator
 from core.story_designer import StoryDesigner
@@ -53,18 +52,6 @@ def _mark_ran(config: Config, run_date: date) -> None:
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _probe_readable(path: Path) -> bool:
-    """Return True only if ffprobe can extract a valid duration (moov atom present)."""
-    try:
-        r = subprocess.run(
-            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
-             "-of", "default=noprint_wrappers=1:nokey=1", str(path)],
-            capture_output=True, text=True, timeout=10,
-        )
-        return r.returncode == 0 and bool(r.stdout.strip())
-    except Exception:
-        return False
-
 
 def _pick_oldest_raw(config: Config) -> Optional[Path]:
     videos = [
@@ -75,7 +62,7 @@ def _pick_oldest_raw(config: Config) -> Optional[Path]:
         return None
     videos.sort(key=lambda v: v.stat().st_mtime)
     for video in videos:
-        if _probe_readable(video):
+        if probe_video(video):
             return video
         print(f"   Skipping corrupt video: {video.name}")
     return None

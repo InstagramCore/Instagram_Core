@@ -29,7 +29,7 @@ from moviepy.video.fx.all import fadein, fadeout
 from config import Config
 from media.audio_manager import AudioManager, Platform
 from media.logo_intro_builder import LogoIntroBuilder
-from utils.helpers import get_timestamp
+from utils.helpers import get_timestamp, probe_video
 
 logger = logging.getLogger(__name__)
 
@@ -112,23 +112,6 @@ class VideoCreator:
         except Exception:
             pass
 
-    @staticmethod
-    def _probe_readable(path: Path) -> bool:
-        """Return True if ffprobe can extract a valid duration from path."""
-        try:
-            r = subprocess.run(
-                [
-                    "ffprobe", "-v", "error",
-                    "-show_entries", "format=duration",
-                    "-of", "default=noprint_wrappers=1:nokey=1",
-                    str(path),
-                ],
-                capture_output=True, text=True, timeout=10,
-            )
-            return r.returncode == 0 and bool(r.stdout.strip())
-        except Exception:
-            return False
-
     # ── Public rendering methods ───────────────────────────────────────────
 
     def from_raw_video(
@@ -141,7 +124,7 @@ class VideoCreator:
         video_path = Path(video_path)
         if not video_path.exists():
             raise FileNotFoundError(f"Raw video not found: {video_path}")
-        if not self._probe_readable(video_path):
+        if not probe_video(video_path):
             raise ValueError(
                 f"Video unreadable — moov atom missing or file incomplete: {video_path.name}"
             )
@@ -153,7 +136,6 @@ class VideoCreator:
         try:
             video = VideoFileClip(str(video_path)).without_audio()
             video = self._crop_9_16(video)
-            video = self._apply_cinematic_effects(video)
             final = self._make_rhythmic_scenes_from_single_video(video, duration)
 
             if self.preset.get("show_main_text", True):
@@ -180,7 +162,7 @@ class VideoCreator:
         # Guard: reject files ffprobe cannot read (moov atom missing, truncated, etc.)
         valid_videos: List[Path] = []
         for v in candidates:
-            if self._probe_readable(v):
+            if probe_video(v):
                 valid_videos.append(v)
             else:
                 logger.warning(
@@ -213,7 +195,6 @@ class VideoCreator:
             for idx, video_path in enumerate(scene_sources):
                 clip = VideoFileClip(str(video_path)).without_audio()
                 clip = self._crop_9_16(clip)
-                clip = self._apply_cinematic_effects(clip)
                 clip = self._extract_scene_from_clip(clip, scene_durations[idx], idx, scene_count)
                 clip = self._prepare_transition_segment(clip, idx)
                 if idx == 0:
@@ -237,11 +218,6 @@ class VideoCreator:
         finally:
             for clip in clips:
                 self._safe_close_clip(clip)
-
-    # ── Cinematic effects ──────────────────────────────────────────────────
-
-    def _apply_cinematic_effects(self, clip):
-        return clip
 
     # ── Scene count / duration helpers ────────────────────────────────────
 

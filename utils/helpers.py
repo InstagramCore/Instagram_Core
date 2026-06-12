@@ -1,6 +1,7 @@
 """General utility helpers."""
 
 import logging
+import subprocess
 from pathlib import Path
 from datetime import datetime
 
@@ -33,3 +34,20 @@ def setup_logger(name: str, log_dir: Path) -> logging.Logger:
 
 def get_timestamp() -> str:
     return datetime.now().strftime("%Y%m%d_%H%M%S")
+
+
+def probe_video(path: Path) -> bool:
+    """Return True if ffprobe can extract a valid duration (moov atom present)."""
+    try:
+        r = subprocess.run(
+            [
+                "ffprobe", "-v", "error",
+                "-show_entries", "format=duration",
+                "-of", "default=noprint_wrappers=1:nokey=1",
+                str(path),
+            ],
+            capture_output=True, text=True, timeout=10,
+        )
+        return r.returncode == 0 and bool(r.stdout.strip())
+    except Exception:
+        return False
