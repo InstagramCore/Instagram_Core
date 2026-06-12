@@ -245,7 +245,7 @@ class AudioManager:
             if total:
                 logger.info(f"[{platform.value}] {total} music file(s) indexed.")
             else:
-                logger.warning(f"[{platform.value}] Music folder empty: {folder}")
+                logger.debug(f"[{platform.value}] Music folder empty: {folder}")
 
     # ──────────────────────────────────────────────────────────────────
     # Selection
