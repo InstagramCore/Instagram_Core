@@ -261,9 +261,10 @@ class AudioManager:
     def get_random(self, platform: Platform, video_name: str = "") -> Optional[Path]:
         """
         موزیک انتخاب می‌کند:
-        1. ابتدا mood مناسب ویدیو را تشخیص می‌دهد
-        2. از موزیک‌های آن mood که اخیراً پخش نشده انتخاب می‌کند
-        3. اگر همه پخش شده باشند → تاریخچه ریست و از اول شروع می‌کند
+        1. mood ویدیو را تشخیص می‌دهد
+        2. از همان mood که اخیراً پخش نشده انتخاب می‌کند
+        3. اگر همه آن mood پخش شد → mood بعدی را امتحان می‌کند
+        4. اگر همه چیز پخش شد → تاریخچه ریست و از mood اصلی شروع می‌کند
         """
         mood_map = self._cache.get(platform, {})
         if not mood_map:
@@ -275,32 +276,37 @@ class AudioManager:
             m for m in self.PLATFORM_DEFAULTS.get(platform, ["random"])
             if m != detected
         ]
+        for m in mood_map:
+            if m not in priorities:
+                priorities.append(m)
 
-        # candidates را mood-sorted بساز
-        candidates: List[Path] = []
-        seen: set = set()
+        played       = _load_music_history()
+        played_names = set(played[-_MAX_HISTORY:])
+
+        # هر mood را به ترتیب اولویت امتحان کن
         for mood in priorities:
-            for f in mood_map.get(mood, []):
-                if f not in seen:
-                    candidates.append(f)
-                    seen.add(f)
-        # بقیه فایل‌ها را هم اضافه کن
-        for files in mood_map.values():
-            for f in files:
-                if f not in seen:
-                    candidates.append(f)
-                    seen.add(f)
+            tracks = mood_map.get(mood, [])
+            if not tracks:
+                continue
+            fresh = [t for t in tracks if t.name not in played_names]
+            if fresh:
+                selected = random.choice(fresh)
+                played.append(selected.name)
+                _save_music_history(played)
+                logger.info(f"[{platform.value}] ✅ {selected.name} [mood={mood}]")
+                return selected
 
-        if not candidates:
-            return None
-
-        # انتخاب بدون تکرار
-        selected = _pick_no_repeat(candidates)
-        if selected:
-            logger.info(f"[{platform.value}] ✅ {selected.name}")
+        # همه پخش شدند → تاریخچه ریست، از mood اصلی شروع
+        logger.info(f"[{platform.value}] همه ترک‌ها پخش شدند — تاریخچه ریست شد")
+        _save_music_history([])
+        primary = mood_map.get(detected) or next(iter(mood_map.values()), [])
+        if primary:
+            selected = random.choice(primary)
+            _save_music_history([selected.name])
+            logger.info(f"[{platform.value}] ✅ (after reset) {selected.name} [mood={detected}]")
             return selected
 
-        return random.choice(candidates)
+        return None
 
     def select_music(
         self,

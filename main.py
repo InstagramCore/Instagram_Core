@@ -151,6 +151,24 @@ def _parse_video_selection(choice: str, total: int) -> Optional[List[int]]:
     choice = choice.strip()
     if choice == "0":
         return list(range(total))
+
+    # Digit-string mode: "12" → [1,2]  "123" → [1,2,3]  "1234" → [1,2,3,4]
+    # Condition: pure digits, no zero, every digit is a valid index, length > 1
+    if (
+        choice.isdigit()
+        and len(choice) > 1
+        and "0" not in choice
+        and all(int(d) <= total for d in choice)
+    ):
+        seen_idx: set = set()
+        result: List[int] = []
+        for d in choice:
+            i = int(d) - 1
+            if i not in seen_idx:
+                seen_idx.add(i)
+                result.append(i)
+        return result or None
+
     indices: List[int] = []
     try:
         for part in choice.split(","):
@@ -169,22 +187,67 @@ def _parse_video_selection(choice: str, total: int) -> Optional[List[int]]:
                 indices.append(idx)
     except ValueError:
         return None
-    seen_idx: set = set()
-    result: List[int] = []
+    seen_idx2: set = set()
+    result2: List[int] = []
     for i in indices:
-        if i not in seen_idx:
-            seen_idx.add(i)
-            result.append(i)
-    return result if result else None
+        if i not in seen_idx2:
+            seen_idx2.add(i)
+            result2.append(i)
+    return result2 if result2 else None
 
 
-def _pick_music_manually() -> Optional[Path]:
+def _analyze_video_mood(video_path: Path) -> str:
+    """Analyze video frames to detect mood: energetic / cinematic / chill / trendy."""
+    try:
+        import numpy as _np
+        from moviepy.editor import VideoFileClip as _VFC
+        clip = _VFC(str(video_path), audio=False)
+        dur  = clip.duration
+        times = [max(0.0, min(dur * t, dur - 0.05)) for t in (0.10, 0.30, 0.55, 0.75, 0.92)]
+        brightnesses: list = []
+        saturations:  list = []
+        motions:      list = []
+        prev_gray = None
+        for t in times:
+            frame = clip.get_frame(t).astype(_np.float32)
+            gray  = frame[:, :, 0] * 0.299 + frame[:, :, 1] * 0.587 + frame[:, :, 2] * 0.114
+            brightnesses.append(float(_np.mean(gray)))
+            r = frame[:, :, 0] / 255.0
+            g = frame[:, :, 1] / 255.0
+            b = frame[:, :, 2] / 255.0
+            cmax = _np.maximum(_np.maximum(r, g), b)
+            cmin = _np.minimum(_np.minimum(r, g), b)
+            sat  = _np.where(cmax > 0.01, (cmax - cmin) / cmax, 0.0)
+            saturations.append(float(_np.mean(sat)))
+            if prev_gray is not None:
+                motions.append(float(_np.mean(_np.abs(gray - prev_gray))))
+            prev_gray = gray
+        clip.close()
+
+        brightness = float(_np.mean(brightnesses))
+        saturation = float(_np.mean(saturations))
+        motion     = float(_np.mean(motions)) if motions else 0.0
+
+        if motion > 18 and saturation > 0.28:
+            return "energetic"
+        if brightness < 88 or saturation < 0.16:
+            return "chill"
+        if motion > 9:
+            return "cinematic"
+        return "trendy"
+    except Exception:
+        return "cinematic"
+
+
+def _pick_music_for_video(selected_videos: List[Path]) -> Optional[Path]:
+    """Auto-detect video mood and pick matching music. User can override."""
     import random as _random
     SUPPORTED = {".mp3", ".wav", ".m4a", ".aac"}
     music_dir = config.INSTAGRAM_MUSIC_DIR
     if not music_dir.exists():
         print(f"   Music folder not found: {music_dir}")
         return None
+
     mood_map: dict = {}
     for subfolder in sorted(music_dir.iterdir()):
         if not subfolder.is_dir():
@@ -199,22 +262,39 @@ def _pick_music_manually() -> Optional[Path]:
     if not mood_map:
         print("   No music found in assets/music/instagram/ — using auto-select.")
         return None
+
+    # Detect mood from first valid video
+    print("\n   Analyzing video mood...", end="", flush=True)
+    detected = _analyze_video_mood(selected_videos[0])
+    print(f" {detected}")
+
     moods = sorted(mood_map.keys())
-    print("\n Select music mood:")
-    print("   0. Auto-select")
+
+    # Find closest matching mood folder
+    best_mood = detected if detected in mood_map else moods[0]
+    auto_track = _random.choice(mood_map[best_mood])
+
+    print(f"   Matched folder : {best_mood}")
+    print(f"   Auto-selected  : {auto_track.name}")
+
+    print("\n   Music mood options:")
+    print("   0. Use auto-selected  ◄")
     for i, mood in enumerate(moods, 1):
-        count = len(mood_map[mood])
-        print(f"   {i}. {mood:<12}  ({count} track{'s' if count > 1 else ''})")
+        count  = len(mood_map[mood])
+        marker = "  ◄ auto" if mood == best_mood else ""
+        print(f"   {i}. {mood:<14} ({count} track{'s' if count > 1 else ''}){marker}")
+
     while True:
-        choice = input("\nSelect mood (0 = auto): ").strip()
+        choice = input("\nSelect mood (Enter/0 = auto): ").strip()
         if choice in ("", "0"):
-            return None
+            print(f"   Using: [{best_mood}] {auto_track.name}")
+            return auto_track
         try:
             idx = int(choice) - 1
             if 0 <= idx < len(moods):
                 mood   = moods[idx]
                 chosen = _random.choice(mood_map[mood])
-                print(f"   Selected: {mood} → {chosen.name}")
+                print(f"   Selected: [{mood}] {chosen.name}")
                 return chosen
             print("   Invalid — try again")
         except ValueError:
@@ -237,15 +317,20 @@ def create_reel() -> Optional[Path]:
         size_mb = v.stat().st_size / (1024 * 1024)
         tag     = "" if ok_map[v] else "  ⚠  CORRUPT — will be skipped"
         print(f"   {i:2}. {v.name} ({size_mb:.1f} MB){tag}")
-    print("\n   0. Combine ALL videos")
-    print("   Tip: multiple selection: 1,3,5  or  2-5  or  1,3-5,7")
+    if len(videos) > 1:
+        print("\n   0. Combine ALL videos")
+        print("   Tip: 1,3,5  or  2-5  or  12 (digits: vids 1&2)  or  123 (vids 1,2,3)")
 
-    while True:
-        choice  = input("\nSelect video(s): ").strip()
-        indices = _parse_video_selection(choice, len(videos))
-        if indices is not None:
-            break
-        print("   Invalid input — try again")
+    if len(videos) == 1:
+        indices = [0]
+        print("\n   (Tan-ha video auto-entekhaab shod)")
+    else:
+        while True:
+            choice  = input("\nSelect video(s): ").strip()
+            indices = _parse_video_selection(choice, len(videos))
+            if indices is not None:
+                break
+            print("   Invalid input — try again")
 
     chosen   = [videos[i] for i in indices]
     corrupt  = [v for v in chosen if not ok_map[v]]
@@ -264,7 +349,7 @@ def create_reel() -> Optional[Path]:
     for v in selected:
         print(f"   • {v.name}")
 
-    manual_music = _pick_music_manually()
+    manual_music = _pick_music_for_video(selected)
 
     vc = VideoCreator(config)
     if len(selected) == 1:
